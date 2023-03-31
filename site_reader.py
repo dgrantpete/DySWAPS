@@ -7,18 +7,26 @@ from dataclasses import dataclass
 from json import load
 from typing import Callable, List, Tuple, Iterable, Optional, Dict
 from collections import Counter
-from itertools import product
+from itertools import combinations, product
 import logging
+import numpy as np
+import pathlib
+from copy import deepcopy
+from tqdm import tqdm
 
 
 WEBDRIVER_PATH = r"webdriver/chromedriver.exe"
 
 
 class Feedback(Enum):
-    ABSENT = "absent"
-    PRESENT = "present"
-    CORRECT = "correct"
-    EMPTY = "empty"
+    ABSENT = 0
+    PRESENT = 1
+    CORRECT = 2
+    EMPTY = 3
+
+    @classmethod
+    def from_str(cls, feedback: str) -> 'Feedback':
+        return cls[feedback.upper()]
 
 
 @dataclass(frozen=True)
@@ -122,7 +130,7 @@ class WordleReader:
                              for feedback in letters)
             row_letters = (letter.text for letter in letters)
 
-            word_feedback.append(WordInfo(LetterInfo(letter, Feedback(
+            word_feedback.append(WordInfo(LetterInfo(letter, Feedback.from_str(
                 feedback)) for letter, feedback in zip(row_letters, row_feedbacks)))
 
         return word_feedback
@@ -132,8 +140,6 @@ class WordleReader:
         return word_feedback[-1]
 
     def input_guess(self, guess: str):
-        logging.info(f"Guessing word '{guess}'")
-
         initial_feedback_len = len(self.get_word_feedback())
         next_row_element = self.driver.find_elements(
             *WordleReader.ROW_SELECTOR)[initial_feedback_len]
@@ -152,7 +158,7 @@ class WordleReader:
 class WordDict:
     def __init__(self, word_list_path: str):
         with open(word_list_path) as word_list:
-            self.words = set(load(word_list))
+            self.words = {word: index for index, word in enumerate(load(word_list))}
 
     def __contains__(self, word: str) -> bool:
         return word in self.words
@@ -213,15 +219,19 @@ class WordDict:
 
 class WordleGame:
     @staticmethod
-    def generate_feedback(answer: str, guess: str) -> WordInfo:
-
+    def generate_full_feedback(answer: str, guess: str) -> WordInfo:
+        return WordInfo(LetterInfo(letter, Feedback(feedback)) for letter, feedback in 
+                        zip(guess, WordleGame.generate_feedback(answer, guess)))
+    
+    @staticmethod
+    def generate_feedback(answer: str, guess: str) -> List[Feedback]:
         unused_feedback_letters = Counter(answer)
 
         feedback = []
 
         for answer_letter, guess_letter in zip(answer, guess):
             if answer_letter == guess_letter:
-                feedback.append(LetterInfo(answer_letter, Feedback.CORRECT))
+                feedback.append(Feedback.CORRECT)
                 unused_feedback_letters[answer_letter] -= 1
             else:
                 # None is a placeholder for letters we can't determine feedback for yet
@@ -238,13 +248,48 @@ class WordleGame:
             else:
                 updated_letter_status = Feedback.ABSENT
 
-            feedback[guess_position] = LetterInfo(
-                letter, updated_letter_status)
+            feedback[guess_position] = updated_letter_status
 
-        return WordInfo(feedback)
+        return feedback
 
 
 class Solver:
+    def __init__(self, word_dict, precomputed_feedback_matrix_path: Optional[str] = None):
+        self.all_words = word_dict
+        self.remaining_words = deepcopy(word_dict)
+        self.feedback_matrix = self.initialize_feedback_matrix(word_dict, precomputed_feedback_matrix_path)
+
+    def initialize_feedback_matrix(self, word_dict, precomputed_feedback_matrix_path: Optional[str] = None):
+        if precomputed_feedback_matrix_path is None:
+            return self.generate_feedback_matrix(word_dict)
+        else:
+            return self.load_feedback_matrix(precomputed_feedback_matrix_path)
+
+    def generate_feedback_matrix(self, word_dict):
+        # This method is extremely expensive, (I should probably implement it in C/Rust down the line)
+        # so I added a progress bar so it's obvious that it's doing something
+        feedback_matrix = np.zeros((len(word_dict), len(word_dict)), dtype=np.uint8)
+
+        progress = tqdm(product(word_dict.words.items(), repeat=2),
+                        total=len(word_dict) ** 2,
+                        desc="Generating feedback matrix")
+
+        for (word1, index1), (word2, index2) in progress:
+            feedback = WordleGame.generate_feedback(word1, word2)
+            feedback_matrix[index1, index2] = self.feedback_to_base3(feedback)
+            
+
+    def load_feedback_matrix(self, precomputed_feedback_matrix_path: str):
+        pass
+    
     @staticmethod
-    def generate_feedback_matrix(word_dict: WordDict) -> Dict[Tuple[str, str], WordInfo]:
-        return {(guess, answer): WordleGame.generate_feedback(answer, guess) for answer, guess in product(word_dict, repeat=2)}
+    def feedback_to_base3(feedback: Iterable[Feedback]) -> int:
+        return sum(3 ** index * feedback.value for index, feedback in enumerate(feedback))
+    
+    @staticmethod
+    def base3_to_feedback(base3: int) -> List[Feedback]:
+        feedback = []
+        while base3 > 0:
+            feedback.append(Feedback(base3 % 3))
+            base3 //= 3
+        return feedback
