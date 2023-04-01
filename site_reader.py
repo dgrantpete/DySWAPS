@@ -13,9 +13,10 @@ import numpy as np
 import pathlib
 from copy import deepcopy
 from tqdm import tqdm
+from random import choices
 
 
-WEBDRIVER_PATH = r"webdriver/chromedriver.exe"
+WEBDRIVER_PATH = r"webdriver\chromedriver.exe"
 
 
 class Feedback(Enum):
@@ -158,24 +159,30 @@ class WordleReader:
 class WordDict:
     def __init__(self, word_list_path: str):
         with open(word_list_path) as word_list:
-            self.words = {word: index for index, word in enumerate(load(word_list))}
+            self.words_list = load(word_list)
+            self.words_list.sort()
+
+            self.words = {word: index for index, word in enumerate(self.words_list)}
 
     def __contains__(self, word: str) -> bool:
         return word in self.words
 
     def __len__(self) -> int:
-        return len(self.words)
+        return len(self.words_list)
 
     def __iter__(self):
-        return iter(self.words)
-
-    def apply_feedback(self, feedback: WordInfo):
-        self.words = set(self.iterate_possible_words(feedback))
+        return iter(self.words_list)
+    
+    def __getitem__(self, index: int | str) -> int | str:
+        if isinstance(index, str):
+            return self.words[index]
+        else:
+            return self.words_list[index]
 
     def iterate_possible_words(self, feedback: WordInfo) -> Iterable[str]:
         feedback_filter = WordDict.make_feedback_filter(feedback)
         return (word for word in self.words if feedback_filter(word))
-
+ 
     @staticmethod
     def make_feedback_filter(feedback: WordInfo) -> Callable[[str], bool]:
         def word_filter(answer: str) -> bool:
@@ -219,77 +226,105 @@ class WordDict:
 
 class WordleGame:
     @staticmethod
-    def generate_full_feedback(answer: str, guess: str) -> WordInfo:
+    def generate_full_feedback(guess: str, answer: str) -> WordInfo:
         return WordInfo(LetterInfo(letter, Feedback(feedback)) for letter, feedback in 
-                        zip(guess, WordleGame.generate_feedback(answer, guess)))
+                        zip(guess, WordleGame.generate_feedback(guess, answer)))
     
     @staticmethod
-    def generate_feedback(answer: str, guess: str) -> List[Feedback]:
-        unused_feedback_letters = Counter(answer)
+    def generate_feedback(guess: str, answer: str) -> List[Feedback]:
+        unused_feedback_letters = list(answer)
+        feedback = [Feedback.EMPTY] * len(answer)
 
-        feedback = []
-
-        for answer_letter, guess_letter in zip(answer, guess):
+        # Calculate CORRECT feedback
+        for i, (answer_letter, guess_letter) in enumerate(zip(answer, guess)):
             if answer_letter == guess_letter:
-                feedback.append(Feedback.CORRECT)
-                unused_feedback_letters[answer_letter] -= 1
-            else:
-                # None is a placeholder for letters we can't determine feedback for yet
-                feedback.append(None)
+                feedback[i] = Feedback.CORRECT
+                unused_feedback_letters.remove(answer_letter)
 
-        for guess_position, letter in enumerate(guess):
-            # We can skip letters we've already determined as correct
-            if feedback[guess_position] is not None:
+        # Calculate PRESENT and ABSENT feedback
+        for i, guess_letter in enumerate(guess):
+            if feedback[i] is not Feedback.EMPTY:
                 continue
 
-            if unused_feedback_letters[letter] > 0:
-                updated_letter_status = Feedback.PRESENT
-                unused_feedback_letters[letter] -= 1
+            if guess_letter in unused_feedback_letters:
+                feedback[i] = Feedback.PRESENT
+                unused_feedback_letters.remove(guess_letter)
             else:
-                updated_letter_status = Feedback.ABSENT
-
-            feedback[guess_position] = updated_letter_status
+                feedback[i] = Feedback.ABSENT
 
         return feedback
 
 
 class Solver:
-    def __init__(self, word_dict, precomputed_feedback_matrix_path: Optional[str] = None):
+    def __init__(self, word_dict, load_matrix_path: Optional[str] = None, save_matrix_path: Optional[str] = None):
         self.all_words = word_dict
         self.remaining_words = deepcopy(word_dict)
-        self.feedback_matrix = self.initialize_feedback_matrix(word_dict, precomputed_feedback_matrix_path)
+        self.feedback_matrix = self.initialize_feedback_matrix(word_dict, load_matrix_path, save_matrix_path)
 
-    def initialize_feedback_matrix(self, word_dict, precomputed_feedback_matrix_path: Optional[str] = None):
-        if precomputed_feedback_matrix_path is None:
-            return self.generate_feedback_matrix(word_dict)
-        else:
-            return self.load_feedback_matrix(precomputed_feedback_matrix_path)
+    def initialize_feedback_matrix(self, word_dict, load_path: Optional[str] = None, save_path: Optional[str] = None):
+        # Feedback matrix is a 2D array with both axes being the word_dict words. It stores the cached feedback for each pair of words.
+        # The feedback is stored as an integer in base 3 (0 = absent, 1 = present, 2 = correct) for maximal space efficiency.
+        # i.e. "Absent, Absent, Present, Correct" is stored as base 3 integer 0012 (which is 5 in base 10)
+        if load_path is not None:
+            return np.load(load_path)
 
-    def generate_feedback_matrix(self, word_dict):
+        return self.generate_feedback_matrix(word_dict, save_path)
+
+    def generate_feedback_matrix(self, word_dict, save_path: Optional[str] = None):
         # This method is extremely expensive, (I should probably implement it in C/Rust down the line)
         # so I added a progress bar so it's obvious that it's doing something
-        feedback_matrix = np.zeros((len(word_dict), len(word_dict)), dtype=np.uint8)
+        feedback_matrix = np.zeros((len(word_dict), len(word_dict)), dtype=np.uint16)
 
         progress = tqdm(product(word_dict.words.items(), repeat=2),
-                        total=len(word_dict) ** 2,
-                        desc="Generating feedback matrix")
+                total=len(word_dict) ** 2,
+                desc="Generating feedback matrix")
 
-        for (word1, index1), (word2, index2) in progress:
-            feedback = WordleGame.generate_feedback(word1, word2)
-            feedback_matrix[index1, index2] = self.feedback_to_base3(feedback)
+        for (guess, guess_index), (answer, answer_index) in progress:
+            feedback_matrix[guess_index, answer_index] = self.gen_matrix_cell(guess, answer)
+
+        if save_path is not None:
+            np.save(save_path, feedback_matrix)
+        
+        return feedback_matrix
             
-
-    def load_feedback_matrix(self, precomputed_feedback_matrix_path: str):
-        pass
+    def gen_matrix_cell(self, guess, answer):
+        feedback = WordleGame.generate_feedback(guess, answer)
+        return self.feedback_to_base_3(feedback)
     
+    def lookup_feedback(self, guess, answer):
+        guess_index, answer_index = self.all_words[guess], self.all_words[answer]
+        return self.base_3_to_feedback(self.feedback_matrix[guess_index, answer_index], len(guess)) # type: ignore
+    
+    def create_bin_counts(self):
+        # Bin quantity is the number of possible feedbacks for a word of length n
+        bin_quantity = 3 ** len(self.all_words[0])
+
+        def bin_count_over_single_axis(arr):
+            return np.bincount(arr, minlength=bin_quantity)
+
+        return np.apply_along_axis(bin_count_over_single_axis, 0, self.feedback_matrix)
+    
+    def matrix_self_test(self) -> bool:
+        """Checks to ensure that the feedback contained in the feedback matrix cooresponds to the actual.
+        Does this by comparing every word to one other random word, and checking that the feedback is the same."""
+        random_word_samples = lambda: choices(self.all_words, k=len(self.all_words))
+
+        return all(self.lookup_feedback(guess, answer) == WordleGame.generate_feedback(guess, answer)
+                   for guess, answer
+                   in zip(self.all_words, random_word_samples()))
+        
     @staticmethod
-    def feedback_to_base3(feedback: Iterable[Feedback]) -> int:
+    def feedback_to_base_3(feedback: Iterable[Feedback]) -> int:
         return sum(3 ** index * feedback.value for index, feedback in enumerate(feedback))
     
     @staticmethod
-    def base3_to_feedback(base3: int) -> List[Feedback]:
+    def base_3_to_feedback(base_3: int, word_length: int) -> List[Feedback]:
         feedback = []
-        while base3 > 0:
-            feedback.append(Feedback(base3 % 3))
-            base3 //= 3
+        while base_3 > 0:
+            feedback.append(Feedback(base_3 % 3))
+            base_3 //= 3
+
+        while len(feedback) < word_length:
+            feedback.append(Feedback.ABSENT)
+
         return feedback
