@@ -9,9 +9,6 @@ from typing import Optional, List
 import logging
 
 
-WEBDRIVER_PATH = r"webdriver\chromedriver.exe"
-
-
 class WordleReader:
 
     WORDLE_URL = r"https://www.nytimes.com/games/wordle/index.html"
@@ -22,11 +19,16 @@ class WordleReader:
     ROW_SELECTOR = (By.XPATH, r"//div[contains(@aria-label,'Row')]")
     LETTER_SELECTOR = (By.XPATH, r".//div[@aria-roledescription='tile']")
 
-    def __init__(self, driver: Optional[webdriver.Chrome] = None):
-        if driver is None:
-            self.driver = webdriver.Chrome(service=Service(WEBDRIVER_PATH))
-        else:
+    def __init__(self, webdriver_path: Optional[str] = None, driver: Optional[webdriver.Chrome] = None):
+        if webdriver_path is not None and driver is not None:
+            raise ValueError("'driver' and 'webdriver_path' should not both be provided")
+
+        if driver is not None:
             self.driver = driver
+        elif webdriver_path is not None:
+            self.driver = webdriver.Chrome(service=Service(webdriver_path))
+        else:
+            raise ValueError("Either 'webdriver_path' or 'driver' must be provided")
 
     def __enter__(self):
         self.navigate_to_wordle()
@@ -64,7 +66,7 @@ class WordleReader:
                              for feedback in letters)
             row_letters = (letter.text for letter in letters)
 
-            word_feedback.append(WordInfo(LetterInfo(letter, Feedback.from_str(
+            word_feedback.append(WordInfo(LetterInfo(letter.lower(), Feedback.from_str(
                 feedback)) for letter, feedback in zip(row_letters, row_feedbacks)))
 
         return word_feedback

@@ -50,8 +50,8 @@ class WordInfo:
     def __getitem__(self, index):
         return self.letters[index]
 
-    @staticmethod
-    def from_word(word: str, feedback: str) -> 'WordInfo':
+    @classmethod
+    def from_word(cls, word: str, feedback: str) -> 'WordInfo':
         letter_info = []
 
         for letter, letter_status in zip(word, feedback):
@@ -59,10 +59,12 @@ class WordInfo:
                 letter_info.append(LetterInfo(letter, Feedback.CORRECT))
             elif letter_status == "1":
                 letter_info.append(LetterInfo(letter, Feedback.PRESENT))
-            else:
+            elif letter_status == "0":
                 letter_info.append(LetterInfo(letter, Feedback.ABSENT))
-
-        return WordInfo(letter_info)
+            else:
+                raise ValueError(f"Invalid letter status '{letter_status}', must be '0', '1' or '2'")\
+                
+        return cls(letter_info)
 
 
 class WordDict:

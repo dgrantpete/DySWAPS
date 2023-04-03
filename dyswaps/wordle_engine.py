@@ -100,7 +100,7 @@ class Solver:
     def apply_feedback(self, feedback: WordInfo):
         self.remaining_possible_answers.filter_impossible_words(feedback)
 
-    def get_best_guess(self):
+    def get_best_guess(self) -> str:
         probabilities = self.create_bin_counts() / len(self.remaining_possible_answers)
         # Create a masked array where zero values are masked
         masked_probabilities = np.ma.masked_equal(probabilities, 0)
@@ -122,7 +122,7 @@ class Solver:
 
         return self.all_words[np.random.choice(best_guess_indexes)]
 
-    def confidence_in_answer(self):
+    def confidence_in_answer(self) -> float:
         return 1 / len(self.remaining_possible_answers)
 
     def matrix_self_test(self) -> bool:
