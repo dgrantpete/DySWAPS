@@ -158,12 +158,11 @@ class WordleReader:
 
 
 class WordDict:
-    def __init__(self, word_list_path: str):
-        with open(word_list_path) as word_list:
-            self.words_list = load(word_list)
-            self.words_list.sort()
+    def __init__(self, words: Iterable[str]):
+        self.words_list = list(words)
+        self.words_list.sort()
 
-            self.words = {word: index for index, word in enumerate(self.words_list)}
+        self.words = {word: index for index, word in enumerate(self.words_list)}
 
     def __contains__(self, word: str) -> bool:
         return word in self.words
@@ -236,6 +235,16 @@ class WordDict:
             return True
 
         return word_filter
+    
+    @classmethod
+    def from_json(cls, filename: str) -> 'WordDict':
+        with open(filename, "r") as f:
+            return cls(load(f))
+        
+    @classmethod
+    def from_file(cls, filename: str) -> 'WordDict':
+        with open(filename, "r") as f:
+            return cls(f.read().splitlines())
 
 
 class WordleGame:
