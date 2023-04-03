@@ -1,4 +1,4 @@
-from site_reader import LetterInfo, WordleGame, WordDict, Feedback, WordInfo, Solver
+from dyswaps import LetterInfo, WordleGame, WordDict, Feedback, WordInfo, Solver
 
 
 def test_generate_feedback():
