@@ -1,4 +1,4 @@
-from dyswaps import Solver, WordDict, Feedback, WordInfo, LetterInfo, WordleReader
+from dyswaps import Solver, WordDict, Feedback, WordInfo, LetterInfo, WordleInteractor
 
 import logging
 import pathlib
@@ -19,8 +19,8 @@ if __name__ == "__main__":
     else:
         solver = Solver(word_dict, save_matrix_path=FEEDBACK_MATRIX_PATH)
 
-    with WordleReader(webdriver_path=r"webdriver\chromedriver.exe") as site_reader:
-        for _ in range(GUESS_ATTEMPTS):
+    with WordleInteractor(webdriver_path=r"webdriver\chromedriver.exe") as site_reader:
+        for guess_count in range(GUESS_ATTEMPTS):
             optimal_guess = solver.get_best_guess()
 
             print(f"Entering optimal guess: '{optimal_guess}'\nRemaining possible answers: {len(solver.remaining_possible_answers)}")
@@ -33,7 +33,7 @@ if __name__ == "__main__":
             solver.apply_feedback(feedback)
 
             if feedback == WordInfo([LetterInfo(letter, Feedback.CORRECT) for letter in optimal_guess]):
-                print(f"Guessed word correctly: '{optimal_guess}'")
+                print(f"Guessed word correctly in {guess_count + 1} guesses: '{optimal_guess}'")
                 break
 
         else:

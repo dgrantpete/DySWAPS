@@ -1,6 +1,5 @@
 from dyswaps import LetterInfo, WordleGame, WordDict, Feedback, WordInfo, Solver
 
-
 def test_generate_feedback():
     test_answer = "aaabb"
     
@@ -30,8 +29,8 @@ def test_base_3_conversions():
     assert to_base_3([Feedback.ABSENT] * 4 + [Feedback.PRESENT]) == 1
 
 def test_word_info_from_str():
-    assert WordInfo.from_word("aabb", "2211") == WordInfo([LetterInfo("a", Feedback.CORRECT), LetterInfo("a", Feedback.CORRECT), LetterInfo("b", Feedback.PRESENT), LetterInfo("b", Feedback.PRESENT)])
-    assert WordInfo.from_word("bbba", "0110") == WordInfo([LetterInfo("b", Feedback.ABSENT), LetterInfo("b", Feedback.PRESENT), LetterInfo("b", Feedback.PRESENT), LetterInfo("a", Feedback.ABSENT)])
+    assert WordInfo.from_strings("aabb", "2211") == WordInfo([LetterInfo("a", Feedback.CORRECT), LetterInfo("a", Feedback.CORRECT), LetterInfo("b", Feedback.PRESENT), LetterInfo("b", Feedback.PRESENT)])
+    assert WordInfo.from_strings("bbba", "0110") == WordInfo([LetterInfo("b", Feedback.ABSENT), LetterInfo("b", Feedback.PRESENT), LetterInfo("b", Feedback.PRESENT), LetterInfo("a", Feedback.ABSENT)])
 
 def test_wordle_game():
     assert WordleGame.generate_full_feedback("aabb", "aaaa") == WordInfo([LetterInfo("a", Feedback.CORRECT), LetterInfo("a", Feedback.CORRECT), LetterInfo("b", Feedback.ABSENT), LetterInfo("b", Feedback.ABSENT)])
@@ -52,7 +51,7 @@ def test_word_dict():
     assert word_dict["aabb"] == 0
     assert word_dict["zzzz"] == 6
 
-    word_dict.filter_impossible_words(WordInfo.from_word("aabb", "0000"))
+    word_dict.filter_impossible_words(WordInfo.from_strings("aabb", "0000"))
 
     assert "aabb" not in word_dict
     assert "zzzz" in word_dict

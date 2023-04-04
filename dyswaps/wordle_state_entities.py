@@ -51,7 +51,7 @@ class WordInfo:
         return self.letters[index]
 
     @classmethod
-    def from_word(cls, word: str, feedback: str) -> 'WordInfo':
+    def from_strings(cls, word: str, feedback: str) -> 'WordInfo':
         letter_info = []
 
         for letter, letter_status in zip(word, feedback):
@@ -152,7 +152,7 @@ class WordDict:
             return cls(load(f))
     
     @classmethod
-    def from_file(cls, filename: str) -> 'WordDict':
+    def from_txt(cls, filename: str) -> 'WordDict':
         with open(filename, "r") as f:
             return cls(f.read().splitlines())
         
