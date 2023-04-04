@@ -20,7 +20,7 @@ if __name__ == "__main__":
         solver = Solver(word_dict, save_matrix_path=FEEDBACK_MATRIX_PATH)
 
     with WordleReader(webdriver_path=r"webdriver\chromedriver.exe") as site_reader:
-        for guess_num in range(6):
+        for _ in range(GUESS_ATTEMPTS):
             optimal_guess = solver.get_best_guess()
 
             print(f"Entering optimal guess: '{optimal_guess}'\nRemaining possible answers: {len(solver.remaining_possible_answers)}")
@@ -37,4 +37,4 @@ if __name__ == "__main__":
                 break
 
         else:
-            print("Failed to guess word correctly within 6 attempts")
+            print(f"Failed to guess word correctly within {GUESS_ATTEMPTS} attempts")
