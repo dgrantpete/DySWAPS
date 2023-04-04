@@ -1,0 +1,7 @@
+dyswaps_venv/
+
+__pycache__/
+.pytest_cache/
+
+*.npy
+webdriver/
