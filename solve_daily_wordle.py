@@ -19,7 +19,7 @@ if __name__ == "__main__":
     else:
         solver = Solver(word_dict, save_matrix_path=FEEDBACK_MATRIX_PATH)
 
-    with WordleInteractor(webdriver_path=r"webdriver\chromedriver.exe") as site_reader:
+    with WordleInteractor(webdriver_path=CHROME_WEBDRIVER_DRIVER_PATH) as site_reader:
         for guess_count in range(GUESS_ATTEMPTS):
             optimal_guess = solver.get_best_guess()
 
