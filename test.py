@@ -28,3 +28,38 @@ def test_base_3_conversions():
     assert to_base_3([Feedback.ABSENT] * 5) == 0
     assert to_base_3([Feedback.CORRECT] * 5) == 242
     assert to_base_3([Feedback.ABSENT] * 4 + [Feedback.PRESENT]) == 1
+
+def test_word_info_from_str():
+    assert WordInfo.from_word("aabb", "2211") == WordInfo([LetterInfo("a", Feedback.CORRECT), LetterInfo("a", Feedback.CORRECT), LetterInfo("b", Feedback.PRESENT), LetterInfo("b", Feedback.PRESENT)])
+    assert WordInfo.from_word("bbba", "0110") == WordInfo([LetterInfo("b", Feedback.ABSENT), LetterInfo("b", Feedback.PRESENT), LetterInfo("b", Feedback.PRESENT), LetterInfo("a", Feedback.ABSENT)])
+
+def test_wordle_game():
+    assert WordleGame.generate_full_feedback("aabb", "aaaa") == WordInfo([LetterInfo("a", Feedback.CORRECT), LetterInfo("a", Feedback.CORRECT), LetterInfo("b", Feedback.ABSENT), LetterInfo("b", Feedback.ABSENT)])
+    assert WordleGame.generate_full_feedback("aabb", "bbbb") == WordInfo([LetterInfo("a", Feedback.ABSENT), LetterInfo("a", Feedback.ABSENT), LetterInfo("b", Feedback.CORRECT), LetterInfo("b", Feedback.CORRECT)])
+    assert WordleGame.generate_full_feedback("aabb", "aabb") == WordInfo([LetterInfo("a", Feedback.CORRECT), LetterInfo("a", Feedback.CORRECT), LetterInfo("b", Feedback.CORRECT), LetterInfo("b", Feedback.CORRECT)])
+    assert WordleGame.generate_full_feedback("aabb", "bbaa") == WordInfo([LetterInfo("a", Feedback.PRESENT), LetterInfo("a", Feedback.PRESENT), LetterInfo("b", Feedback.PRESENT), LetterInfo("b", Feedback.PRESENT)])
+
+def test_word_dict():
+    word_dict = WordDict(["zzzz", "aabb", "abab", "bbaa", "baba", "abba", "baab"])
+
+    assert "aabb" in word_dict
+    assert "abab" in word_dict
+    assert "cccc" not in word_dict
+
+    assert word_dict[0] == "aabb"
+    assert word_dict[-1] == "zzzz"
+
+    assert word_dict["aabb"] == 0
+    assert word_dict["zzzz"] == 6
+
+    word_dict.filter_impossible_words(WordInfo.from_word("aabb", "0000"))
+
+    assert "aabb" not in word_dict
+    assert "zzzz" in word_dict
+
+    assert word_dict[0] == "zzzz"
+
+    assert word_dict["zzzz"] == 0
+
+    assert list(word_dict) == ["zzzz"]
+    assert len(word_dict) == 1
