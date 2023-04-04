@@ -100,7 +100,7 @@ class WordDict:
     def filter_impossible_words(self, feedback: WordInfo) -> None:
         """Filters out all words that cannot generate the given feedback (as implemented in WordleReader.get_word_feedback)."""
         self.words_list = [word for word in self.iterate_possible_words(feedback)]
-        self.words = {word: self.words[word] for word in self.words_list}
+        self.words = {word: i for i, word in enumerate(self.words_list)}
 
     def iterate_possible_words(self, feedback: WordInfo) -> Iterable[str]:
         feedback_filter = WordDict.make_feedback_filter(feedback)
